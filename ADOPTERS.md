@@ -21,3 +21,9 @@ This is a list of adopters of using PowerShell in production or in their product
 * [PowerShell Universal Dashboard](https://ironmansoftware.com/powershell-universal-dashboard) is a cross-platform web framework for PowerShell. 
   It provides the ability to create robust, interactive websites, REST APIs, and Electron-based desktop apps with PowerShell script. 
   More information about PowerShell Universal Dashboard is available at the [PowerShell Universal Dashboard Docs](https://docs.universaldashboard.io).
+* [System Frontier](https://systemfrontier.com/solutions/powershell/) provides dynamically generated web GUIs and REST APIs for PowerShell and other scripting languages.  
+  Enable non-admins like help desk and tier 1 support teams to execute secure web based tools on any platform `without admin rights`.  
+  Configure flexible RBAC permissions from an intuitive interface, without a complex learning curve.  
+  Script output along with all actions are audited. Manage up to 5,000 nodes for free with the [Community Edition](https://systemfrontier.com/solutions/community-edition/).
+* [Azure Resource Manager Deployment Scripts](https://docs.microsoft.com/azure/azure-resource-manager/templates/deployment-script-template) Complete the "last mile" of your Azure Resource Manager (ARM) template deployments with a Deployment Script, which enables you to run an arbitrary PowerShell script in the context of a deployment.
+  Designed to let you complete tasks that should be part of a deployment, but are not possible in an ARM template today — for example, creating a Key Vault certificate or querying an external API for a new CIDR block. 

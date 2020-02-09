@@ -332,27 +332,27 @@ namespace Microsoft.PowerShell.Commands
                     {
                         fileBaseName = moduleName;
 #endif
-                        string qualifiedPath = Path.Combine(path, fileBaseName);
-                        module = LoadUsingMultiVersionModuleBase(qualifiedPath, manifestProcessingFlags, options, out found);
-                        if (!found)
-                        {
-                            if (name.IndexOfAny(Utils.Separators.Directory) == -1)
-                            {
-                                qualifiedPath = Path.Combine(qualifiedPath, fileBaseName);
-                            }
-                            else if (Directory.Exists(qualifiedPath))
-                            {
-                                // if it points to a directory, add the basename back onto the path...
-                                qualifiedPath = Path.Combine(qualifiedPath, Path.GetFileName(fileBaseName));
-                            }
+                string qualifiedPath = Path.Combine(path, fileBaseName);
+                module = LoadUsingMultiVersionModuleBase(qualifiedPath, manifestProcessingFlags, options, out found);
+                if (!found)
+                {
+                    if (name.IndexOfAny(Utils.Separators.Directory) == -1)
+                    {
+                        qualifiedPath = Path.Combine(qualifiedPath, fileBaseName);
+                    }
+                    else if (Directory.Exists(qualifiedPath))
+                    {
+                        // if it points to a directory, add the basename back onto the path...
+                        qualifiedPath = Path.Combine(qualifiedPath, Path.GetFileName(fileBaseName));
+                    }
 
-                            module = LoadUsingExtensions(parentModule, name, qualifiedPath, extension, null, this.BasePrefix, ss, options, manifestProcessingFlags, out found);
-                        }
+                    module = LoadUsingExtensions(parentModule, name, qualifiedPath, extension, null, this.BasePrefix, ss, options, manifestProcessingFlags, out found);
+                }
 
-                        if (found)
-                        {
-                            break;
-                        }
+                if (found)
+                {
+                    break;
+                }
 #if UNIX
                     }
                 }
@@ -1853,23 +1853,15 @@ namespace Microsoft.PowerShell.Commands
             else if ((requiredProcessorArchitecture != ProcessorArchitecture.None) &&
                      (requiredProcessorArchitecture != ProcessorArchitecture.MSIL))
             {
-                bool isRunningOnArm = false;
-                ProcessorArchitecture currentArchitecture = PsUtils.GetProcessorArchitecture(out isRunningOnArm);
+                ProcessorArchitecture currentArchitecture = typeof(object).Assembly.GetName().ProcessorArchitecture;
 
-                // For ARM Architectures, we need to do additional string-level comparison
-                if ((currentArchitecture != requiredProcessorArchitecture && !isRunningOnArm) ||
-                    (isRunningOnArm &&
-                     !requiredProcessorArchitecture.ToString()
-                         .Equals(PsUtils.ArmArchitecture, StringComparison.OrdinalIgnoreCase)))
+                if (currentArchitecture != requiredProcessorArchitecture)
                 {
                     containedErrors = true;
                     if (writingErrors)
                     {
-                        string actualCurrentArchitecture = isRunningOnArm
-                            ? PsUtils.ArmArchitecture
-                            : currentArchitecture.ToString();
                         message = StringUtil.Format(Modules.InvalidProcessorArchitecture,
-                            actualCurrentArchitecture, moduleManifestPath, requiredProcessorArchitecture);
+                            currentArchitecture, moduleManifestPath, requiredProcessorArchitecture);
                         InvalidOperationException ioe = new InvalidOperationException(message);
                         ErrorRecord er = new ErrorRecord(ioe, "Modules_InvalidProcessorArchitecture",
                             ErrorCategory.ResourceUnavailable, moduleManifestPath);
@@ -2363,18 +2355,58 @@ namespace Microsoft.PowerShell.Commands
             bool isConsideredCompatible = ModuleUtils.IsPSEditionCompatible(moduleManifestPath, inferredCompatiblePSEditions);
             if (!BaseSkipEditionCheck && !isConsideredCompatible)
             {
-                if (importingModule)
+                if (PowerShellConfig.Instance.IsImplicitWinCompatEnabled())
                 {
-                    IList<PSModuleInfo> moduleProxies = ImportModulesUsingWinCompat(new string [] {moduleManifestPath}, null, new ImportModuleOptions());
+                    if (importingModule)
+                    {
+                        IList<PSModuleInfo> moduleProxies = ImportModulesUsingWinCompat(new string[] { moduleManifestPath }, null, new ImportModuleOptions());
 
-                    // we are loading by a single ManifestPath so expect max of 1
-                    if(moduleProxies.Count > 0)
-                    {
-                        return moduleProxies[0];
+                        // we are loading by a single ManifestPath so expect max of 1
+                        if (moduleProxies.Count > 0)
+                        {
+                            return moduleProxies[0];
+                        }
+                        else
+                        {
+                            return null;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    containedErrors = true;
+                    if (writingErrors)
                     {
-                        return null;
+                        message = StringUtil.Format(
+                            Modules.ImplicitWinCompatDisabled,
+                            moduleManifestPath,
+                            string.Join(',', inferredCompatiblePSEditions));
+
+                        ErrorRecord er = new ErrorRecord(
+                            new InvalidOperationException(message),
+                            nameof(Modules) + "_" + nameof(Modules.ImplicitWinCompatDisabled),
+                            ErrorCategory.ResourceUnavailable,
+                            moduleManifestPath);
+
+                        WriteError(er);
+                    }
+
+                    if (bailOnFirstError)
+                    {
+                        // If we're trying to load the module, return null so that caches
+                        // are not polluted
+                        if (importingModule)
+                        {
+                            return null;
+                        }
+
+                        // If we return null with Get-Module, a fake module info will be created. Since
+                        // we want to suppress output of the module, we need to do that here.
+                        return new PSModuleInfo(moduleManifestPath, context: null, sessionState: null)
+                        {
+                            HadErrorsLoading = true,
+                            IsConsideredEditionCompatible = false,
+                        };
                     }
                 }
             }
@@ -4778,7 +4810,7 @@ namespace Microsoft.PowerShell.Commands
         internal PSSession CreateWindowsPowerShellCompatResources()
         {
             PSSession compatSession = null;
-            lock(s_WindowsPowerShellCompatSyncObject)
+            lock (s_WindowsPowerShellCompatSyncObject)
             {
                 compatSession = GetWindowsPowerShellCompatRemotingSession();
                 if (compatSession == null)
@@ -4802,7 +4834,7 @@ namespace Microsoft.PowerShell.Commands
 
         internal void CleanupWindowsPowerShellCompatResources()
         {
-            lock(s_WindowsPowerShellCompatSyncObject)
+            lock (s_WindowsPowerShellCompatSyncObject)
             {
                 var compatSession = GetWindowsPowerShellCompatRemotingSession();
                 if (compatSession != null)
@@ -4816,7 +4848,7 @@ namespace Microsoft.PowerShell.Commands
             }
         }
 
-        internal virtual IList<PSModuleInfo> ImportModulesUsingWinCompat(IEnumerable<string> moduleNames, IEnumerable<ModuleSpecification> moduleFullyQualifiedNames, ImportModuleOptions importModuleOptions) {throw new System.NotImplementedException();}
+        internal virtual IList<PSModuleInfo> ImportModulesUsingWinCompat(IEnumerable<string> moduleNames, IEnumerable<ModuleSpecification> moduleFullyQualifiedNames, ImportModuleOptions importModuleOptions) { throw new System.NotImplementedException(); }
 
         private void RemoveTypesAndFormatting(
             IList<string> formatFilesToRemove,
